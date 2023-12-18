@@ -26,9 +26,7 @@ Notes:
     both domains. We'll sacrifice some frequency resolution to have the temporal resolution that we want. 
     
     See this link https://www.youtube.com/watch?v=MBnnXbOM5S4 for more details.
-    
-    Down sampling does not seem to improve .csv loading time. All of the data is loaded, then it is down sampled. This 
-    simply expedites the cluster labeling time. Use that as you will. 
+
 """
 
 
@@ -36,7 +34,7 @@ Notes:
 # Inputs
 ########################################################################################################################
 
-plot_original_data = False  # Plot the original data using Plotly resampler
+plot_original_data = True  # Plot the original data using Plotly resampler
 debug_plots = True  # Plot optional plots to see what the script is doing behind the scenes
 plot_all_clusters = True  # Plot the final results
 
@@ -49,15 +47,15 @@ y_col = "Signal"  # The column name for the dependent data to be clustered
 
 frequency_ranges = {  # The different frequency ranges to be identified
     # "name": (min, max) in Hz
-    "Low Freq": (0, 5),
-    "High Freq": (25, 45)
+    "Low": (0, 5),
+    "High": (25, 45)
 }
 
 """
 This is how many seconds we want between times we determine the frequency. The smaller this is, the longer the run time.
 See the note above. 
 """
-temporal_resolution = 1.5  # seconds
+temporal_resolution = 0.75  # seconds
 
 
 """
@@ -65,13 +63,7 @@ Eps is the greediness of the clustering. Larger eps means larger clusters. Too l
 cluster. Too small and all the data will be considered noise. Min samples is the minimum number of points in the 
 spectrogram space (see the dominant frequencies plot in debug mode) for a cluster to be considered a cluster.
 """
-clustering_parameters = {"eps": 0.2, "min_samples": 50}
-
-
-"""
-We have data sampled way faster than we really need it. We can down sample our data slightly to improve runtime.
-"""
-read_every_nth_row = 1
+clustering_parameters = {"eps": 0.17, "min_samples": 50}
 
 
 ########################################################################################################################
@@ -90,7 +82,7 @@ with tqdm(total=1, desc="Loading Data") as pbar:
     # Originally this was done lazily since the CSV files had superfluous columns, and the data
     # was split between multiple CSV files, each with 1e6 data points. Now it isn't necessary...
     
-    df = pl.scan_csv(files, try_parse_dates=True).gather_every(read_every_nth_row).collect()
+    df = pl.scan_csv(files, try_parse_dates=True).collect()
     pbar.update(1)  # Update the progress bar
 
 # Need to convert to Numpy because Polars still isn't widely supported in the Python ecosystem
@@ -104,17 +96,31 @@ if plot_original_data:
 
         x = np.squeeze(df.select(df.columns[0]).to_numpy())  # Get the time column in numpy
 
-        fig = FigureResampler(go.Figure())
+        # I don't have enough data to merit using this, but when I did here was how to implement it
+
+        # fig = FigureResampler(go.Figure())
+        # fig.add_trace(
+        #     go.Scattergl(
+        #         name='Vertical Displacement',
+        #         showlegend=True
+        #     ),
+        #     hf_x=x,
+        #     hf_y=y,
+        # )
+        # pbar.update(1)
+        # fig.show_dash()
+        
+        fig = go.Figure()
         fig.add_trace(
             go.Scattergl(
+                x=x,
+                y=y,
                 name='Vertical Displacement',
                 showlegend=True
             ),
-            hf_x=x,
-            hf_y=y,
         )
         pbar.update(1)
-        fig.show_dash()
+        fig.show(renderer="browser")
 
 # ----------------------------------------------------------------------------------------------------------------------
 #%% Calculate the Spectrogram
@@ -288,22 +294,53 @@ with tqdm(total=1, desc="Labeling Clusters") as pbar:
 if plot_all_clusters:
     with tqdm(total=len(cluster_times), desc="Plotting Final Results. This may take a while...") as pbar:
 
-        fig = FigureResampler(go.Figure())
+        # Use the following if you have a looooot of data. I didn't and
+        # I wanted to save my final plot, which you can't do with plotly resampler        
 
+        # fig = FigureResampler(go.Figure()) 
+        
+        # for cluster_label in cluster_times:
+
+        #     fig.add_trace(
+        #         go.Scattergl(
+        #             name=(
+        #                 f'Cluster {cluster_label}: {cluster_types[cluster_label]} Freq = '
+        #                 f'{cluster_frequencies[cluster_label]:.2f}'
+        #                 if cluster_label != -1 else "Noise"
+        #             ),
+        #             showlegend=True,
+        #             mode="markers",
+        #         ),
+        #         hf_x=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(time_col).to_numpy()),
+        #         hf_y=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(y_col).to_numpy()),
+        #     )
+        #     pbar.update(1)
+
+        # fig.update_layout(
+        #     xaxis_title=time_col,
+        #     yaxis_title=y_col,
+        #     title='Final Identified Clusters'
+        # )
+
+        # fig.show_dash()
+        
+    
+        fig = go.Figure()
+        
         for cluster_label in cluster_times:
 
             fig.add_trace(
                 go.Scattergl(
+                    x=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(time_col).to_numpy()),
+                    y=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(y_col).to_numpy()),
                     name=(
                         f'Cluster {cluster_label}: {cluster_types[cluster_label]} Freq = '
                         f'{cluster_frequencies[cluster_label]:.2f}'
                         if cluster_label != -1 else "Noise"
                     ),
                     showlegend=True,
-                    mode="markers",
+                    mode="lines+markers" if cluster_label != -1 else "markers",
                 ),
-                hf_x=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(time_col).to_numpy()),
-                hf_y=np.squeeze(df.filter(pl.col("Cluster") == cluster_label).select(y_col).to_numpy()),
             )
             pbar.update(1)
 
@@ -312,8 +349,9 @@ if plot_all_clusters:
             yaxis_title=y_col,
             title='Final Identified Clusters'
         )
-
-        fig.show_dash()
+        
+        fig.show(renderer="browser")
+        fig.write_html("./plots/clustered_data.html")
 
 
 

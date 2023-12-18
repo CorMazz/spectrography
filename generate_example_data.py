@@ -100,7 +100,7 @@ if __name__ == "__main__":  # Added this in case I want to import those function
     ]
     
     # Set the sampling frequency
-    sampling_frequency = 150
+    sampling_frequency = 149
     
     # ------------------------------------------------------------------------------------------------------------------
     # Generate Signal
@@ -121,6 +121,7 @@ if __name__ == "__main__":  # Added this in case I want to import those function
     fig.add_trace(go.Scatter(x=datetime_array, y=signal, mode='lines', name='Signal'))
     fig.update_layout(title='Signal', xaxis_title='Time', yaxis_title='Amplitude')
     fig.show(renderer='browser')
+    fig.write_html("./plots/initial_data.html")
     
     # Turn the signal into a Polars dataframe and write it to a CSV
     df = pl.DataFrame({'Time': convert_to_datetime(time), 'Signal': signal})
