@@ -149,13 +149,14 @@ with tqdm(total=1, desc="Calculating Spectrogram") as pbar:
 # Create a Plotly heatmap
 if debug_plots:
     # Plot this on a log scale because the magnitudes are very, very, very different...
-    fig = go.Figure(data=go.Heatmap(z=10*np.log10(Sxx), x=t, y=f, colorscale='Viridis'))
+    fig = go.Figure(data=go.Heatmap(z=10*np.log10(Sxx), x=t, y=f, colorscale="Viridis"))
 
     # Set axis labels
     fig.update_layout(
         xaxis_title='Time [sec]',
         yaxis_title='Frequency [Hz]',
-        title='Spectrogram'
+        title='Spectrogram: Spectral Power in DB',
+
     )
     fig.show(renderer="browser")
     fig.write_html("./plots/spectrogram.html")
