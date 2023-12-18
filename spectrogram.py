@@ -169,8 +169,8 @@ if debug_plots:
 dominant_frequencies = f[np.argmax(Sxx, axis=0)]
 
 if debug_plots:
-    # Plot this on a log scale because the magnitudes are very, very, very different...
-    fig = go.Figure(data=go.Scatter(x=t, y=dominant_frequencies))
+
+    fig = go.Figure(data=go.Scatter(x=t, y=dominant_frequencies, mode='markers'))
 
     # Set axis labels
     fig.update_layout(
